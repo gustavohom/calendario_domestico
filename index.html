@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lar em Ordem</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Pacifico&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f7fafc; }
+        .pacifico-font { font-family: 'Pacifico', cursive; }
+        .modal-enter { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .printing-pdf .no-print { display: none !important; }
+        .icon-btn { background: transparent; border: none; padding: 4px; border-radius: 9999px; transition: background-color 0.2s; }
+        .icon-btn:hover { background-color: #e2e8f0; }
+        .assigned-task { cursor: pointer; }
+        .avatar-display { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 2.5em; line-height: 1; background-color: #e2e8f0; color: #475569; }
+        .assigned-task .assigned-avatar-container.freq-quinzenal { border-color: #f59e0b; } /* amber-500 */
+        .assigned-task .assigned-avatar-container.freq-mensal { border-color: #3b82f6; } /* blue-500 */
+        .task-completed { opacity: 0.6; }
+        .task-completed .assigned-avatar-container { filter: grayscale(80%); }
+        .task-completed .assigned-name { text-decoration: line-through; }
+        #tasks-body td {
+            border: 1px solid #f1f5f9; /* slate-100 */
+            vertical-align: middle;
+        }
+        .dropdown:hover .dropdown-menu { display: block; }
+    </style>
+</head>
+<body class="p-2 sm:p-4 md:p-6">
+
+    <div id="main-content" class="max-w-7xl mx-auto bg-white rounded-2xl shadow-xl p-4 sm:p-6 md:p-8">
+        
+        <header class="text-center mb-6 relative">
+            <h1 class="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500 pacifico-font">Lar em Ordem</h1>
+            <p class="text-slate-500 mt-2">Seu centro de organização doméstica, agora mais poderoso.</p>
+            <div class="absolute top-0 right-0 flex gap-2 no-print">
+                <button id="save-pdf-btn" class="bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105 flex items-center gap-2 text-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    <span class="hidden sm:inline">PDF</span>
+                </button>
+                 <div class="dropdown relative inline-block">
+                    <button class="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105 flex items-center gap-2 text-sm">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+                        <span class="hidden sm:inline">Opções</span>
+                    </button>
+                    <ul class="dropdown-menu absolute hidden text-gray-700 pt-1 right-0 w-48 bg-white rounded-md shadow-lg z-50">
+                        <li><a id="export-data-btn" class="rounded-t hover:bg-gray-200 py-2 px-4 block whitespace-no-wrap" href="#">Exportar Dados</a></li>
+                        <li><a id="import-data-btn" class="hover:bg-gray-200 py-2 px-4 block whitespace-no-wrap" href="#">Importar Dados</a></li>
+                    </ul>
+                </div>
+            </div>
+        </header>
+
+        <section class="mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-slate-700">Membros da Casa</h2>
+                <button id="add-member-btn" class="no-print bg-teal-100 text-teal-700 hover:bg-teal-200 font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105 flex items-center gap-2 text-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    Adicionar
+                </button>
+            </div>
+            <div id="members-container" class="flex flex-wrap gap-4 sm:gap-6"></div>
+        </section>
+
+        <section class="mb-6 p-4 bg-slate-50 rounded-xl no-print">
+            <div class="flex flex-col sm:flex-row items-center gap-4">
+                <input type="text" id="new-task-input" placeholder="Digite o nome da nova tarefa semanal..." class="flex-grow w-full sm:w-auto px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-400 focus:outline-none transition">
+                <button id="add-task-btn" class="w-full sm:w-auto bg-gradient-to-r from-teal-400 to-blue-500 hover:from-teal-500 hover:to-blue-600 text-white font-bold py-2 px-6 rounded-lg transition-transform transform hover:scale-105 flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    Adicionar Tarefa
+                </button>
+            </div>
+        </section>
+        
+        <div class="flex justify-center my-4 no-print relative">
+            <div id="week-selector-container" class="bg-slate-100 p-1 rounded-full flex items-center gap-1"></div>
+            <button id="edit-weeks-btn" class="absolute right-0 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-slate-200 transition"><svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></button>
+        </div>
+
+        <main class="overflow-x-auto">
+            <table id="tasks-grid" class="w-full border-collapse text-center">
+                <thead>
+                    <tr class="bg-slate-100">
+                        <th class="p-3 font-semibold text-slate-600 text-left sticky left-0 bg-slate-100 z-10 w-1/4">Tarefa Semanal</th>
+                        <th class="p-3 font-semibold text-slate-600 min-w-[120px]">Segunda</th>
+                        <th class="p-3 font-semibold text-slate-600 min-w-[120px]">Terça</th>
+                        <th class="p-3 font-semibold text-slate-600 min-w-[120px]">Quarta</th>
+                        <th class="p-3 font-semibold text-slate-600 min-w-[120px]">Quinta</th>
+                        <th class="p-3 font-semibold text-slate-600 min-w-[120px]">Sexta</th>
+                        <th class="p-3 font-semibold text-slate-600 min-w-[120px]">Sábado</th>
+                        <th class="p-3 font-semibold text-slate-600 min-w-[120px]">Domingo</th>
+                    </tr>
+                </thead>
+                <tbody id="tasks-body"></tbody>
+            </table>
+        </main>
+        
+        <section class="mt-12">
+            <h2 class="text-xl font-bold text-slate-700 mb-4">Tarefas Gerais</h2>
+            <div class="bg-slate-50 p-4 rounded-xl">
+                <div class="flex gap-4 mb-4 no-print">
+                    <input type="text" id="new-general-task-input" placeholder="Ex: Comprar pão" class="flex-grow px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-400">
+                    <button id="add-general-task-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg transition">Adicionar</button>
+                </div>
+                <ul id="general-tasks-list" class="space-y-2"></ul>
+            </div>
+        </section>
+    </div>
+
+    <div id="modal-container"></div>
+    <input type="file" id="image-upload-input" class="hidden" accept="image/*">
+    <input type="file" id="import-file-input" class="hidden" accept=".json">
+
+    <script>
+        const { jsPDF } = window.jspdf;
+
+        // --- DATA & STATE ---
+        const APP_STORAGE_KEY = 'larEmOrdemData';
+        let members, generalTasks, weekNames, data, nextMemberId, nextTaskId, nextGeneralTaskId, activeWeek;
+        let activeContext = null, uploadCallback = null;
+        
+        // --- ASSETS ---
+        const personIcons = ['🧑','👩','👨','🧑‍🦱','👩‍🦱','👨‍🦱','🧑‍🦰','👩‍🦰','👨‍🦰','👱','👱‍♀️','👱‍♂️','🧑‍🦳','👩‍🦳','👨‍🦳','👴','👵','👲','👳','👮','👮‍♀️','👮‍♂️','🕵️','🕵️‍♀️','🕵️‍♂️','💂','💂‍♀️','💂‍♂️','👷','👷‍♀️','👷‍♂️','🧑‍⚕️','👩‍⚕️','👨‍⚕️','🧑‍🌾','👩‍🌾','👨‍🌾','🧑‍🍳','👩‍🍳','👨‍🍳','🧑‍🎤','👩‍🎤','👨‍🎤','🧑‍🎨','👩‍🎨','👨‍🎨','🧑‍✈️','👩‍✈️','👨‍✈️','🧑‍🚀','👩‍🚀','👨‍🚀','🧑‍🚒','👩‍🚒','👨‍🚒','🥷','🦸','🦸‍♀️','🦸‍♂️','🦹','🦹‍♀️','🦹‍♂️'];
+        const taskIcons = ['🧼','🗑️','🚽','🧹','🧺','🍽️','🛒','🌱','🐶','🐱','🐾','🤖','📦','💸','💡','🧽','🥘','👔','🚗','🛠️','澆水','🔧','🔨','✉️','📞','💻','📚','📝','📈','📌','📎','📏','✂️','📁','📅', '🦴'];
+
+        // --- DOM ELEMENTS ---
+        const dom = {
+            membersContainer: document.getElementById('members-container'),
+            tasksBody: document.getElementById('tasks-body'),
+            addTaskBtn: document.getElementById('add-task-btn'),
+            newTaskInput: document.getElementById('new-task-input'),
+            addMemberBtn: document.getElementById('add-member-btn'),
+            modalContainer: document.getElementById('modal-container'),
+            savePdfBtn: document.getElementById('save-pdf-btn'),
+            mainContent: document.getElementById('main-content'),
+            imageUploadInput: document.getElementById('image-upload-input'),
+            importFileInput: document.getElementById('import-file-input'),
+            exportDataBtn: document.getElementById('export-data-btn'),
+            importDataBtn: document.getElementById('import-data-btn'),
+            weekSelectorContainer: document.getElementById('week-selector-container'),
+            editWeeksBtn: document.getElementById('edit-weeks-btn'),
+            generalTasksList: document.getElementById('general-tasks-list'),
+            newGeneralTaskInput: document.getElementById('new-general-task-input'),
+            addGeneralTaskBtn: document.getElementById('add-general-task-btn'),
+        };
+
+        // --- DATA PERSISTENCE ---
+        function saveData() {
+            const appData = {
+                members, generalTasks, weekNames, data,
+                nextMemberId, nextTaskId, nextGeneralTaskId, activeWeek
+            };
+            localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(appData));
+        }
+
+        function loadData() {
+            const savedData = localStorage.getItem(APP_STORAGE_KEY);
+            if (savedData) {
+                const appData = JSON.parse(savedData);
+                members = appData.members;
+                generalTasks = appData.generalTasks;
+                weekNames = appData.weekNames;
+                data = appData.data;
+                nextMemberId = appData.nextMemberId;
+                nextTaskId = appData.nextTaskId;
+                nextGeneralTaskId = appData.nextGeneralTaskId;
+                activeWeek = appData.activeWeek;
+            } else {
+                // Default initial data if nothing is saved
+                members = [ { id: 1, name: 'Ana', avatar: '👩‍🦰' }, { id: 2, name: 'João', avatar: '👨‍🦱' } ];
+                generalTasks = [{id: 1, text: 'Comprar ração', icon: '🦴', done: true, memberId: 1}];
+                weekNames = ['Semana A', 'Semana B'];
+                data = {
+                    'Semana A': {
+                        tasks: [
+                            { id: 1, name: 'Lavar a Louça', icon: '🧼', frequency: 'Semanal' },
+                            { id: 2, name: 'Tirar o Lixo', icon: '🗑️', frequency: 'Semanal' },
+                        ],
+                        assignments: { '1-0': {memberId: 1, completed: false} }
+                    },
+                    'Semana B': {
+                        tasks: [],
+                        assignments: {}
+                    }
+                };
+                nextMemberId = 3;
+                nextTaskId = 3;
+                nextGeneralTaskId = 2;
+                activeWeek = 'Semana A';
+            }
+        }
+
+        // --- RENDER FUNCTIONS ---
+        function renderAll() {
+            renderWeekSelector();
+            renderMembers();
+            renderTasksGrid();
+            renderGeneralTasks();
+        }
+
+        function renderAvatar(avatar, alt, classes) {
+            if (avatar.startsWith('http') || avatar.startsWith('data:image')) {
+                return `<img src="${avatar}" alt="${alt}" class="${classes} object-cover">`;
+            }
+            return `<div class="${classes} avatar-display">${avatar || alt.charAt(0)}</div>`;
+        }
+        
+        function renderWeekSelector() {
+            dom.weekSelectorContainer.innerHTML = weekNames.map(weekName => `
+                <button class="week-toggle-btn font-semibold px-4 py-1 rounded-full text-sm transition-colors ${weekName === activeWeek ? 'bg-white text-teal-600 shadow' : 'text-slate-500'}" data-week-name="${weekName}">${weekName}</button>
+            `).join('');
+        }
+
+        function renderMembers() {
+            dom.membersContainer.innerHTML = members.map(member => `
+                <div class="text-center group">
+                    <div class="w-16 h-16 rounded-full shadow-md border-4 border-white mx-auto transition-transform transform group-hover:scale-110 overflow-hidden">
+                        ${renderAvatar(member.avatar, member.name, 'w-full h-full')}
+                    </div>
+                    <p class="mt-2 font-semibold text-slate-600">${member.name}</p>
+                    <button class="edit-member-btn no-print text-xs text-indigo-500 hover:underline" data-member-id="${member.id}">Editar</button>
+                </div>
+            `).join('');
+        }
+
+        function renderTasksGrid() {
+            const activeWeekIndex = weekNames.indexOf(activeWeek);
+            const weekData = data[activeWeek] || { tasks: [], assignments: {} };
+            const tasksToRender = weekData.tasks;
+            const weekAssignments = weekData.assignments;
+
+            dom.tasksBody.innerHTML = tasksToRender.map(task => {
+                let isTaskActiveThisWeek = true;
+                if ((task.frequency === 'Quinzenal' && activeWeekIndex % 2 !== 0) || (task.frequency === 'Mensal' && activeWeekIndex !== 0)) {
+                    isTaskActiveThisWeek = false;
+                }
+                const frequencyColors = { 'Semanal': 'bg-green-100 text-green-800', 'Quinzenal': 'bg-amber-100 text-amber-800', 'Mensal': 'bg-blue-100 text-blue-800' };
+                
+                return `
+                <tr data-task-id="${task.id}">
+                    <td class="p-3 text-left font-semibold text-slate-800 sticky left-0 bg-white z-10 whitespace-nowrap">
+                        <div class="flex items-center gap-3">
+                            <span class="text-3xl">${task.icon.startsWith('<img') ? task.icon : `<span>${task.icon}</span>`}</span>
+                            <div>
+                                <span>${task.name}</span>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-xs font-medium px-2 py-0.5 rounded-full ${frequencyColors[task.frequency]}">${task.frequency}</span>
+                                    <button class="edit-task-btn icon-btn no-print" data-task-id="${task.id}"><svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg></button>
+                                    <button class="remove-task-btn icon-btn no-print" data-task-id="${task.id}"><svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                    ${Array(7).fill(0).map((_, dayIndex) => {
+                        const assignmentKey = `${task.id}-${dayIndex}`;
+                        const assignment = weekAssignments[assignmentKey];
+                        const member = assignment ? members.find(m => m.id === assignment.memberId) : null;
+                        return `<td class="p-2" data-day="${dayIndex}">
+                            <div class="w-full h-full flex items-center justify-center">
+                                ${ isTaskActiveThisWeek ? (
+                                    member ? createAssignedTaskHTML(member, assignment.completed, task.frequency) :
+                                    `<button class="assign-btn no-print w-12 h-12 bg-slate-200 hover:bg-teal-200 text-slate-500 hover:text-teal-600 rounded-full flex items-center justify-center text-2xl font-bold transition-all duration-300 transform hover:scale-110">+</button>`
+                                ) : '<div class="w-12 h-12"></div>'}
+                            </div>
+                        </td>`;
+                    }).join('')}
+                </tr>`;
+            }).join('');
+        }
+
+        function renderGeneralTasks() {
+            dom.generalTasksList.innerHTML = generalTasks.map(item => {
+                const member = members.find(m => m.id === item.memberId);
+                return `
+                <li class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-100" data-id="${item.id}">
+                    <input type="checkbox" class="general-task-check h-5 w-5 rounded text-teal-500 focus:ring-teal-400 flex-shrink-0" ${item.done ? 'checked' : ''}>
+                    <span class="text-2xl">${item.icon.startsWith('<img') ? item.icon : `<span>${item.icon}</span>`}</span>
+                    <span class="flex-grow ${item.done ? 'line-through text-slate-400' : 'text-slate-700'}">${item.text}</span>
+                    <div class="assign-general-task-container cursor-pointer" data-id="${item.id}">
+                        ${member ? 
+                            `<div class="w-8 h-8 rounded-full overflow-hidden shadow-sm">${renderAvatar(member.avatar, member.name, 'w-full h-full')}</div>` :
+                            `<button class="assign-general-task-btn no-print w-8 h-8 bg-slate-200 hover:bg-teal-200 text-slate-500 hover:text-teal-600 rounded-full flex items-center justify-center text-lg font-bold transition-all">+</button>`
+                        }
+                    </div>
+                    <button class="edit-general-task-btn icon-btn no-print" data-id="${item.id}"><svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg></button>
+                    <button class="remove-general-task-btn icon-btn no-print" data-id="${item.id}"><svg class="w-5 h-5 text-slate-400 hover:text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                </li>`;
+            }).join('');
+        }
+
+        // --- MODAL & CONFIRMATION ---
+        function openModal(id, title, content, footer) {
+            const modalHTML = `
+            <div id="${id}" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onclick="if (event.target.id === '${id}') closeModal();">
+                <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-2xl max-w-md w-full mx-auto modal-enter">
+                    <h3 class="text-2xl font-bold text-slate-800 mb-6 text-center">${title}</h3>
+                    <div id="modal-content-body"></div>
+                    <div class="mt-8">${footer}</div>
+                </div>
+            </div>`;
+            dom.modalContainer.innerHTML = modalHTML;
+            const contentBody = dom.modalContainer.querySelector('#modal-content-body');
+            if (typeof content === 'string') {
+                contentBody.innerHTML = content;
+            } else {
+                contentBody.appendChild(content);
+            }
+        }
+        function closeModal() { dom.modalContainer.innerHTML = ''; }
+        function openConfirmModal(message, onConfirm) {
+            openModal('confirm-modal', 'Confirmação', `<p class="text-center text-slate-600">${message}</p>`,
+                `<div class="flex gap-4">
+                    <button id="confirm-cancel" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg transition">Cancelar</button>
+                    <button id="confirm-ok" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 px-4 rounded-lg transition">Confirmar</button>
+                </div>`
+            );
+            document.getElementById('confirm-ok').onclick = () => { onConfirm(); closeModal(); };
+            document.getElementById('confirm-cancel').onclick = closeModal;
+        }
+
+        // --- CORE LOGIC ---
+        function createIconPicker(icons, selectedIcon, onSelect) {
+            const container = document.createElement('div');
+            container.className = 'grid grid-cols-6 sm:grid-cols-8 gap-2 max-h-48 overflow-y-auto p-2 bg-slate-100 rounded-lg';
+            icons.forEach(icon => {
+                const el = document.createElement('div');
+                el.className = `text-3xl p-2 rounded-lg hover:bg-slate-200 cursor-pointer transition flex items-center justify-center ${icon === selectedIcon ? 'bg-teal-200' : ''}`;
+                el.innerHTML = icon.startsWith('<img') ? icon : `<span>${icon}</span>`;
+                el.onclick = () => {
+                    container.querySelector('.bg-teal-200')?.classList.remove('bg-teal-200');
+                    el.classList.add('bg-teal-200');
+                    onSelect(icon);
+                };
+                container.appendChild(el);
+            });
+            return container;
+        }
+        
+        function openAddMemberModal() {
+            openModal('add-member-modal', 'Adicionar Novo Membro',
+                `<input type="text" id="new-member-name" placeholder="Nome da pessoa" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-400">`,
+                `<button id="confirm-add-member" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg transition">Salvar</button>`
+            );
+            document.getElementById('confirm-add-member').onclick = () => {
+                const name = document.getElementById('new-member-name').value.trim();
+                if (name) {
+                    const newMember = { id: nextMemberId++, name, avatar: name.charAt(0).toUpperCase() };
+                    members.push(newMember);
+                    renderAll();
+                    saveData();
+                    closeModal();
+                }
+            };
+        }
+
+        function openEditMemberModal(memberId) {
+            const member = members.find(m => m.id === memberId);
+            if (!member) return;
+            let newAvatar = member.avatar;
+            
+            const content = document.createElement('div');
+            content.className = 'space-y-4';
+            content.innerHTML = `
+                <input type="text" id="edit-member-name" value="${member.name}" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+                <div class="flex flex-col items-center gap-4">
+                    <div id="edit-avatar-preview" class="w-24 h-24 rounded-full shadow-lg overflow-hidden">${renderAvatar(member.avatar, member.name, 'w-full h-full')}</div>
+                    <div class="flex gap-2">
+                        <button class="upload-avatar-btn text-sm cursor-pointer bg-indigo-100 text-indigo-700 font-semibold px-3 py-1 rounded-lg hover:bg-indigo-200">Upload</button>
+                        <button class="pick-icon-btn text-sm cursor-pointer bg-indigo-100 text-indigo-700 font-semibold px-3 py-1 rounded-lg hover:bg-indigo-200">Ícones</button>
+                    </div>
+                </div>
+                <div id="member-icon-picker-container"></div>
+            `;
+            const footer = `
+                <button id="save-member-changes" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg transition">Salvar Alterações</button>
+                <button id="remove-member-btn" class="mt-2 w-full bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold py-2 px-4 rounded-lg transition">Remover Membro</button>
+            `;
+            openModal('edit-member-modal', 'Editar Membro', content, footer);
+
+            const previewEl = document.getElementById('edit-avatar-preview');
+            const iconPickerContainer = document.getElementById('member-icon-picker-container');
+
+            document.getElementById('save-member-changes').onclick = () => {
+                member.name = document.getElementById('edit-member-name').value.trim();
+                member.avatar = newAvatar;
+                renderAll();
+                saveData();
+                closeModal();
+            };
+            document.getElementById('remove-member-btn').onclick = () => {
+                openConfirmModal(`Tem certeza que deseja remover ${member.name}?`, () => {
+                    members = members.filter(m => m.id !== memberId);
+                    renderAll();
+                    saveData();
+                });
+            };
+            document.querySelector('.upload-avatar-btn').onclick = () => {
+                uploadCallback = (url) => {
+                    newAvatar = url;
+                    previewEl.innerHTML = renderAvatar(url, member.name, 'w-full h-full');
+                };
+                dom.imageUploadInput.click();
+            };
+            document.querySelector('.pick-icon-btn').onclick = () => {
+                if (iconPickerContainer.innerHTML) {
+                    iconPickerContainer.innerHTML = '';
+                } else {
+                    iconPickerContainer.appendChild(createIconPicker(personIcons, newAvatar, (icon) => {
+                        newAvatar = icon;
+                        previewEl.innerHTML = renderAvatar(icon, member.name, 'w-full h-full');
+                    }));
+                }
+            };
+        }
+        
+        function openTaskModal(taskToEdit = null) {
+            const isEditing = taskToEdit !== null;
+            const title = isEditing ? 'Editar Tarefa' : `Adicionar Tarefa em ${activeWeek}`;
+            const taskName = isEditing ? taskToEdit.name : dom.newTaskInput.value.trim();
+            const taskFrequency = isEditing ? taskToEdit.frequency : 'Semanal';
+            let newIcon = isEditing ? taskToEdit.icon : taskIcons[0];
+
+            if (!isEditing && !taskName) { alert("Digite o nome da tarefa."); return; }
+
+            const content = document.createElement('div');
+            content.className = 'space-y-4';
+            content.innerHTML = `
+                <input type="text" id="task-name-input" value="${taskName}" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+                <select id="task-frequency-select" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+                    <option value="Semanal" ${taskFrequency === 'Semanal' ? 'selected' : ''}>Semanal</option>
+                    <option value="Quinzenal" ${taskFrequency === 'Quinzenal' ? 'selected' : ''}>Quinzenal</option>
+                    <option value="Mensal" ${taskFrequency === 'Mensal' ? 'selected' : ''}>Mensal</option>
+                </select>
+                <div class="flex gap-2 justify-center">
+                    <button class="upload-task-icon-btn text-sm cursor-pointer bg-indigo-100 text-indigo-700 font-semibold px-3 py-1 rounded-lg hover:bg-indigo-200">Upload</button>
+                    <button class="pick-task-icon-btn text-sm cursor-pointer bg-indigo-100 text-indigo-700 font-semibold px-3 py-1 rounded-lg hover:bg-indigo-200">Ícones</button>
+                </div>
+                <div id="task-icon-picker-container"></div>
+            `;
+            const footer = `<button id="save-task-btn" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg transition">Salvar</button>`;
+            openModal('task-modal', title, content, footer);
+            
+            const iconPickerContainer = document.getElementById('task-icon-picker-container');
+            
+            document.querySelector('.upload-task-icon-btn').onclick = () => {
+                uploadCallback = (url) => newIcon = `<img src="${url}" class="w-8 h-8 object-contain inline-block">`;
+                dom.imageUploadInput.click();
+            };
+            document.querySelector('.pick-task-icon-btn').onclick = () => {
+                if (iconPickerContainer.innerHTML) {
+                    iconPickerContainer.innerHTML = '';
+                } else {
+                    iconPickerContainer.appendChild(createIconPicker(taskIcons, newIcon, (icon) => newIcon = icon));
+                }
+            };
+            document.getElementById('save-task-btn').onclick = () => {
+                const name = document.getElementById('task-name-input').value.trim();
+                const frequency = document.getElementById('task-frequency-select').value;
+                if (!name) return;
+                
+                if (!data[activeWeek]) {
+                    data[activeWeek] = { tasks: [], assignments: {} };
+                }
+                
+                if (isEditing) {
+                    taskToEdit.name = name;
+                    taskToEdit.icon = newIcon;
+                    taskToEdit.frequency = frequency;
+                } else {
+                    data[activeWeek].tasks.push({ id: nextTaskId++, name, icon: newIcon, frequency });
+                    dom.newTaskInput.value = '';
+                }
+                renderAll();
+                saveData();
+                closeModal();
+            };
+        }
+
+        function openGeneralTaskModal(taskToEdit = null) {
+            const isEditing = taskToEdit !== null;
+            const title = isEditing ? 'Editar Tarefa Geral' : 'Adicionar Tarefa Geral';
+            const taskText = isEditing ? taskToEdit.text : dom.newGeneralTaskInput.value.trim();
+            let newIcon = isEditing ? taskToEdit.icon : taskIcons[0];
+
+            if (!isEditing && !taskText) { alert("Digite o nome da tarefa."); return; }
+
+            const content = document.createElement('div');
+            content.className = 'space-y-4';
+            content.innerHTML = `
+                <input type="text" id="general-task-text-input" value="${taskText}" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+                <div class="flex gap-2 justify-center">
+                    <button class="upload-task-icon-btn text-sm cursor-pointer bg-indigo-100 text-indigo-700 font-semibold px-3 py-1 rounded-lg hover:bg-indigo-200">Upload</button>
+                    <button class="pick-task-icon-btn text-sm cursor-pointer bg-indigo-100 text-indigo-700 font-semibold px-3 py-1 rounded-lg hover:bg-indigo-200">Ícones</button>
+                </div>
+                <div id="task-icon-picker-container"></div>
+            `;
+            const footer = `<button id="save-general-task-btn" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg transition">Salvar</button>`;
+            openModal('general-task-modal', title, content, footer);
+            
+            const iconPickerContainer = document.getElementById('task-icon-picker-container');
+            
+            document.querySelector('.upload-task-icon-btn').onclick = () => {
+                uploadCallback = (url) => newIcon = `<img src="${url}" class="w-8 h-8 object-contain inline-block">`;
+                dom.imageUploadInput.click();
+            };
+            document.querySelector('.pick-task-icon-btn').onclick = () => {
+                if (iconPickerContainer.innerHTML) {
+                    iconPickerContainer.innerHTML = '';
+                } else {
+                    iconPickerContainer.appendChild(createIconPicker(taskIcons, newIcon, (icon) => newIcon = icon));
+                }
+            };
+            document.getElementById('save-general-task-btn').onclick = () => {
+                const text = document.getElementById('general-task-text-input').value.trim();
+                if (!text) return;
+                
+                if (isEditing) {
+                    taskToEdit.text = text;
+                    taskToEdit.icon = newIcon;
+                } else {
+                    generalTasks.push({ id: nextGeneralTaskId++, text, icon: newIcon, done: false });
+                    dom.newGeneralTaskInput.value = '';
+                }
+                renderAll();
+                saveData();
+                closeModal();
+            };
+        }
+
+        function createAssignedTaskHTML(member, isCompleted, frequency) {
+            const freqClass = frequency === 'Quinzenal' ? 'freq-quinzenal' : frequency === 'Mensal' ? 'freq-mensal' : '';
+            return `
+                <div class="assigned-task flex flex-col items-center justify-center gap-1 relative group animate-pop-in ${isCompleted ? 'task-completed' : ''}" data-member-id="${member.id}">
+                    <div class="w-12 h-12 rounded-full shadow-md border-4 border-white overflow-hidden assigned-avatar-container ${freqClass}">
+                        ${renderAvatar(member.avatar, member.name, 'w-full h-full')}
+                    </div>
+                    <p class="text-xs font-semibold text-slate-500 assigned-name">${member.name}</p>
+                    <div class="absolute top-0 right-0 -mt-1 -mr-1 no-print">
+                        <input type="checkbox" class="complete-checkbox h-5 w-5 rounded-full text-teal-500 focus:ring-teal-400 border-slate-300 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" ${isCompleted ? 'checked' : ''}>
+                    </div>
+                </div>`;
+        }
+        
+        function openAssigneeModal() {
+            const content = `<div class="grid grid-cols-3 sm:grid-cols-4 gap-4">${members.map(member => `
+                <div class="text-center cursor-pointer member-select-avatar" data-member-id="${member.id}">
+                    <div class="w-20 h-20 rounded-full shadow-lg border-4 border-transparent hover:border-teal-400 transition-all duration-200 transform hover:scale-110 overflow-hidden mx-auto">
+                        ${renderAvatar(member.avatar, member.name, 'w-full h-full')}
+                    </div>
+                    <p class="mt-2 font-semibold text-slate-600">${member.name}</p>
+                </div>
+            `).join('')}</div>`;
+            openModal('assignee-modal', 'Quem fará esta tarefa?', content, `<button id="close-modal-btn" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg transition">Fechar</button>`);
+            document.querySelectorAll('.member-select-avatar').forEach(el => el.onclick = (e) => assignTask(parseInt(e.currentTarget.dataset.memberId)));
+            document.getElementById('close-modal-btn').onclick = closeModal;
+        }
+
+        function assignTask(memberId) {
+            if (!activeContext) return;
+            if (activeContext.type === 'grid') {
+                const { taskId, dayIndex } = activeContext;
+                const assignmentKey = `${taskId}-${dayIndex}`;
+                if (!data[activeWeek]) data[activeWeek] = { tasks: [], assignments: {} };
+                if (!data[activeWeek].assignments) data[activeWeek].assignments = {};
+                data[activeWeek].assignments[assignmentKey] = { memberId, completed: false };
+            } else if (activeContext.type === 'general') {
+                const task = generalTasks.find(t => t.id === activeContext.id);
+                if (task) task.memberId = memberId;
+            }
+            renderAll();
+            saveData();
+            closeModal();
+        }
+        function openAssignmentOptionsModal() {
+             if (!activeContext) return;
+            const footer = `
+                <button id="change-assignee" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg transition mb-2">Trocar Pessoa</button>
+                <button id="remove-assignee" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 px-4 rounded-lg transition">Remover Atribuição</button>
+                <button class="close-modal-btn mt-4 w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg transition">Fechar</button>`;
+            openModal('assignment-options-modal', 'Opções', '', footer);
+            document.getElementById('change-assignee').onclick = () => { closeModal(); openAssigneeModal(); };
+            document.getElementById('remove-assignee').onclick = () => {
+                if (activeContext.type === 'grid') {
+                    const { taskId, dayIndex } = activeContext;
+                    if (data[activeWeek] && data[activeWeek].assignments) {
+                        delete data[activeWeek].assignments[`${taskId}-${dayIndex}`];
+                    }
+                } else if (activeContext.type === 'general') {
+                    const task = generalTasks.find(t => t.id === activeContext.id);
+                    if (task) delete task.memberId;
+                }
+                renderAll();
+                saveData();
+                closeModal();
+            };
+            document.querySelector('.close-modal-btn').onclick = closeModal;
+        }
+
+        function openEditWeeksModal() {
+            const renderWeekList = () => {
+                return weekNames.map((weekName, index) => `
+                    <div class="flex items-center gap-2">
+                        <input type="text" value="${weekName}" data-index="${index}" class="week-name-input flex-grow px-3 py-1 border border-slate-300 rounded-lg">
+                        <button class="remove-week-btn icon-btn" data-index="${index}" ${weekNames.length === 1 ? 'disabled' : ''}><svg class="w-5 h-5 ${weekNames.length === 1 ? 'text-slate-300' : 'text-rose-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                    </div>
+                `).join('');
+            };
+
+            const content = `
+                <div id="weeks-list" class="space-y-2">${renderWeekList()}</div>
+                <button id="add-new-week-btn" class="mt-4 text-sm text-teal-600 font-semibold hover:underline">Adicionar Nova Semana</button>
+            `;
+            const footer = `<button id="save-weeks-btn" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg transition">Salvar e Fechar</button>`;
+            openModal('edit-weeks-modal', 'Gerenciar Semanas', content, footer);
+
+            document.getElementById('add-new-week-btn').onclick = () => {
+                const newWeekName = `Semana ${String.fromCharCode(65 + weekNames.length)}`;
+                weekNames.push(newWeekName);
+                data[newWeekName] = { tasks: [], assignments: {} };
+                openEditWeeksModal();
+            };
+            document.querySelectorAll('.remove-week-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    const index = parseInt(e.currentTarget.dataset.index);
+                    const weekNameToDelete = weekNames[index];
+                    delete data[weekNameToDelete];
+                    weekNames.splice(index, 1);
+                    if (activeWeek === weekNameToDelete) {
+                        activeWeek = weekNames[0] || '';
+                    }
+                    openEditWeeksModal();
+                };
+            });
+            document.getElementById('save-weeks-btn').onclick = () => {
+                const newWeekNames = [];
+                const newData = {};
+                let newActiveWeek = activeWeek;
+
+                document.querySelectorAll('.week-name-input').forEach((input, index) => {
+                    const oldName = weekNames[index];
+                    const newName = input.value.trim() || oldName;
+                    newWeekNames.push(newName);
+                    newData[newName] = data[oldName] || { tasks: [], assignments: {} };
+                    if(activeWeek === oldName) {
+                        newActiveWeek = newName;
+                    }
+                });
+                
+                weekNames = newWeekNames;
+                data = newData;
+                activeWeek = newActiveWeek;
+
+                renderAll();
+                saveData();
+                closeModal();
+            };
+        }
+
+        // --- EVENT LISTENERS ---
+        function addEventListeners() {
+            document.body.addEventListener('click', (e) => {
+                const target = e.target;
+                
+                if (target.closest('.week-toggle-btn')) {
+                    activeWeek = target.closest('.week-toggle-btn').dataset.weekName;
+                    renderAll();
+                    saveData();
+                }
+                else if (target.closest('.edit-member-btn')) {
+                    openEditMemberModal(parseInt(target.closest('.edit-member-btn').dataset.memberId));
+                }
+                else if (target.closest('.edit-task-btn')) {
+                    const taskId = parseInt(target.closest('.edit-task-btn').dataset.taskId);
+                    const task = data[activeWeek]?.tasks.find(t => t.id === taskId);
+                    if(task) openTaskModal(task);
+                }
+                else if (target.closest('.remove-task-btn')) {
+                    const taskId = parseInt(target.closest('.remove-task-btn').dataset.taskId);
+                    const task = data[activeWeek]?.tasks.find(t => t.id === taskId);
+                    if(task) {
+                        openConfirmModal(`Tem certeza que deseja remover a tarefa "${task.name}"?`, () => {
+                            data[activeWeek].tasks = data[activeWeek].tasks.filter(t => t.id !== taskId);
+                            renderAll();
+                            saveData();
+                        });
+                    }
+                }
+                else if (target.closest('.assign-btn')) {
+                    const cell = target.closest('td');
+                    const row = target.closest('tr');
+                    activeContext = { type: 'grid', taskId: parseInt(row.dataset.taskId), dayIndex: parseInt(cell.dataset.day) };
+                    openAssigneeModal();
+                }
+                else if (target.closest('.assigned-task')) {
+                    const cell = target.closest('td');
+                    const row = target.closest('tr');
+                    activeContext = { type: 'grid', taskId: parseInt(row.dataset.taskId), dayIndex: parseInt(cell.dataset.day) };
+                    openAssignmentOptionsModal();
+                }
+                else if (target.closest('.edit-general-task-btn')) {
+                    const id = parseInt(target.closest('.edit-general-task-btn').dataset.id);
+                    const task = generalTasks.find(t => t.id === id);
+                    if (task) openGeneralTaskModal(task);
+                }
+                else if (target.closest('.remove-general-task-btn')) {
+                    const id = parseInt(target.closest('li').dataset.id);
+                    generalTasks = generalTasks.filter(i => i.id !== id);
+                    renderGeneralTasks();
+                    saveData();
+                }
+                else if (target.closest('.assign-general-task-container')) {
+                    const id = parseInt(target.closest('.assign-general-task-container').dataset.id);
+                    activeContext = { type: 'general', id };
+                    const task = generalTasks.find(t => t.id === id);
+                    if (task && task.memberId) {
+                        openAssignmentOptionsModal();
+                    } else {
+                        openAssigneeModal();
+                    }
+                }
+            });
+
+            document.body.addEventListener('change', (e) => {
+                const target = e.target;
+                if (target.matches('.complete-checkbox')) {
+                    const row = target.closest('tr');
+                    const cell = target.closest('td');
+                    const taskId = parseInt(row.dataset.taskId);
+                    const dayIndex = parseInt(cell.dataset.day);
+                    const assignmentKey = `${taskId}-${dayIndex}`;
+                    const weekAssignments = data[activeWeek]?.assignments || {};
+                    if (weekAssignments[assignmentKey]) {
+                        weekAssignments[assignmentKey].completed = target.checked;
+                        target.closest('.assigned-task').classList.toggle('task-completed', target.checked);
+                        saveData();
+                    }
+                }
+                else if (target.matches('.general-task-check')) {
+                    const id = parseInt(target.closest('li').dataset.id);
+                    const task = generalTasks.find(i => i.id === id);
+                    if(task) task.done = target.checked;
+                    renderGeneralTasks();
+                    saveData();
+                }
+            });
+
+            dom.addMemberBtn.onclick = openAddMemberModal;
+            dom.addTaskBtn.onclick = () => openTaskModal();
+            dom.editWeeksBtn.onclick = openEditWeeksModal;
+            dom.addGeneralTaskBtn.onclick = () => openGeneralTaskModal();
+            dom.imageUploadInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file && uploadCallback) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => uploadCallback(ev.target.result);
+                    reader.readAsDataURL(file);
+                }
+                e.target.value = null;
+            };
+            dom.savePdfBtn.onclick = () => {
+                 document.body.classList.add('printing-pdf');
+                html2canvas(dom.mainContent, { scale: 2, useCORS: true })
+                    .then(canvas => {
+                        const imgData = canvas.toDataURL('image/png');
+                        const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width, canvas.height] });
+                        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                        pdf.save(`lar-em-ordem-${activeWeek}.pdf`);
+                    })
+                    .finally(() => document.body.classList.remove('printing-pdf'));
+            };
+            dom.exportDataBtn.onclick = (e) => {
+                e.preventDefault();
+                const appData = { members, generalTasks, weekNames, data, nextMemberId, nextTaskId, nextGeneralTaskId, activeWeek };
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", "lar-em-ordem-config.json");
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+            };
+            dom.importDataBtn.onclick = (e) => {
+                e.preventDefault();
+                dom.importFileInput.click();
+            };
+            dom.importFileInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const importedData = JSON.parse(event.target.result);
+                        // Basic validation
+                        if (importedData.members && importedData.weekNames && importedData.data) {
+                            members = importedData.members;
+                            generalTasks = importedData.generalTasks || [];
+                            weekNames = importedData.weekNames;
+                            data = importedData.data;
+                            nextMemberId = importedData.nextMemberId || Math.max(...members.map(m => m.id), 0) + 1;
+                            nextTaskId = importedData.nextTaskId || Math.max(...Object.values(data).flatMap(w => w.tasks).map(t => t.id), 0) + 1;
+                            nextGeneralTaskId = importedData.nextGeneralTaskId || Math.max(...generalTasks.map(t => t.id), 0) + 1;
+                            activeWeek = importedData.activeWeek || weekNames[0];
+                            
+                            renderAll();
+                            saveData();
+                            alert('Dados importados com sucesso!');
+                        } else {
+                            alert('Erro: Arquivo de importação inválido.');
+                        }
+                    } catch (error) {
+                        alert('Erro ao ler o arquivo. Verifique se é um JSON válido.');
+                        console.error("Import error:", error);
+                    }
+                };
+                reader.readAsText(file);
+                e.target.value = null; // Reset input
+            };
+        }
+        
+        // --- INITIALIZATION ---
+        loadData();
+        renderAll();
+        addEventListeners();
+    </script>
+</body>
+</html>
